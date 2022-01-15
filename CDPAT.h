@@ -222,10 +222,6 @@ namespace cdpat {
 		void setPatternName(const std::string& name) {
 			this->name = name;
 		} 
-
-		std::string getSongPath() const {
-			return res_path + "music/mus_" + song_name + ".ogg";
-		}
 		
 		const EventsData& getEvents() const {
 			return events;
@@ -366,8 +362,9 @@ namespace cdpat {
 
 			ofs << "#cdpat " << CDPAT_VERSION << "\n";
 			ofs << "#song " << song_name << "\n";
-			ofs << "#bpm " << bpm << "\n";
-			ofs << "#sig " << sig << "\n";
+			//Deprecated, now stored in RhythmStream resource
+			//ofs << "#bpm " << bpm << "\n";
+			//ofs << "#sig " << sig << "\n";
 
 			// Save events
 			
