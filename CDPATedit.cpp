@@ -72,19 +72,18 @@ void reloadAudio() {
 	//Load rhythm data
 	std::ifstream ifs(resource_path);
 
+	if (!ifs) {
+		std::cerr << "Failed to open RhythmStream at location " << resource_path << "\n";
+	}
 
 	//Fucking christ we have to parse .tres files
 	std::unordered_map<int, std::string> ext_resources;
-	std::unordered_map < std::string, std::string> properties;
+	std::unordered_map <std::string, std::string> properties;
+	std::unordered_map<std::string, std::vector<std::string>> arrays;
 
 	while (ifs) {
-
-		//Debug
-
 		std::string token;
 		ifs >> token;
-		
-		
 
 		// Parse external resources
 		if (token == "[gd_resource") {
@@ -107,31 +106,32 @@ void reloadAudio() {
 
 				ext_resources[id_num] = path;
 			}
-
 			continue;
 		}
 
 		if (token == "[resource]") {
 			while (ifs) {
-				std::string junk, name;
+				std::string junk, name, val;
 				
 				ifs >> name;
 				ifs >> junk;
-
-				std::string val;
-
 				ifs >> val;
+
+				std::vector<std::string> array_result;
 
 				if (val == "ExtResource(") {
 					ifs >> val; // value
 					ifs >> junk; // ")"
+
 					assert(junk == ")");
+
 				} else if (val == "[") {
 					std::string accum;
 					
 					do {
 						ifs >> accum;
 						val += accum;
+						std::cout << accum << "\n";
 					} 
 					while (ifs && accum != "]");
 				}
@@ -180,7 +180,6 @@ int main() {
 	sf::RenderWindow window(sf::VideoMode(1280, 720), "CDPATedit", sf::Style::Default | sf::Style::Resize, settings);
 	window.setVerticalSyncEnabled(true);
 	ImGui::SFML::Init(window);
-	window.setFramerateLimit(60);
 	
 	
 	//Windows specific
@@ -274,13 +273,17 @@ int main() {
 		auto low = events.lower_bound(mousePosMapped.y);
 		const float threshold = .5f;
 		float closest = -1.0f;
+
 		if (low != events.end()) {
-			auto prev = std::prev(low);
+			//If `low` is the first event, prev is invalid
+			auto prev = low == events.begin() ? events.end() : std::prev(low);
 
+			// Distance to note below cursor
+			float distA = std::abs(low->first - mousePosMapped.y);
 
-			float distA = low != events.end() ? std::abs(low->first - mousePosMapped.y) : std::abs(prev->first - mousePosMapped.y);
 			float distB = prev != events.end() ? std::abs(prev->first - mousePosMapped.y) : INFINITY;
-			bool isPrevClosest = distB < distA || low == events.end();
+			
+			bool isPrevClosest = distB < distA;
 
 			if (distA < threshold || distB < threshold) {
 				if (isPrevClosest)
@@ -387,6 +390,7 @@ int main() {
 							
 							case Keyboard::S:
 								(void)pattern.saveToFile();
+								refreshDirectory();
 								break;
 							
 							default:
@@ -458,6 +462,10 @@ int main() {
 			scroll_y = lerp(scroll_y, scroll_y_goal, 0.2f);
 
 
+		static bool saveAsMenu = false;
+		static std::string saveAsName = "";
+
+		static bool helpPanelOpen = false;
 		// ImGui
 	
 		ImGui::SFML::Update(window, deltaClock.restart());
@@ -471,8 +479,16 @@ int main() {
 				
 				ImGui::Separator();
 				
-				if (ImGui::MenuItem("Save"))
-					(void)pattern.saveToFile();
+				if (ImGui::MenuItem("Save", "Ctrl+S")) {
+					if (pattern.getPatternName().empty()) {
+						saveAsMenu = true;
+						saveAsName = "";
+					}
+					else {
+						pattern.saveToFile();
+						refreshDirectory();
+					}
+				}
 
 				if (ImGui::MenuItem("Locate CHORDIOID folder...")) {
 					const char* filters[] = { "project.godot" };
@@ -497,8 +513,15 @@ int main() {
 				ImGui::EndMenu();
 			}
 			if (ImGui::BeginMenu("Edit")) {
-				if (ImGui::MenuItem("Undo", nullptr, false, pattern.canUndo())) pattern.undo();
-				if (ImGui::MenuItem("Redo", nullptr, false, pattern.canRedo())) pattern.redo();
+				if (ImGui::MenuItem("Undo", "Ctrl+Z", false, pattern.canUndo())) pattern.undo();
+				if (ImGui::MenuItem("Redo", "Ctrl+Y", false, pattern.canRedo())) pattern.redo();
+				ImGui::EndMenu();
+			}
+
+			if (ImGui::BeginMenu("Help")) {
+				if (ImGui::MenuItem("Show Help Panel"))
+					helpPanelOpen = true;
+
 				ImGui::EndMenu();
 			}
 			ImGui::EndMainMenuBar();
@@ -509,10 +532,8 @@ int main() {
 			//}
 		}
 
-		static bool saveAsMenu = false;
-		static std::string saveAsName = "";
-		
 		if (ImGui::Begin("Pattern")) {
+			ImGui::Text("Pattern list (click to open):");
 			ImGui::PushItemWidth(-1);
 			if (ImGui::BeginListBox("##Directory")) {
 
@@ -527,9 +548,9 @@ int main() {
 			bool patternUntitled = pattern.getPatternName().empty();
 
 			if (patternUntitled)
-				ImGui::Text("(Untitled pattern)");
+				ImGui::Text("Opened pattern: (Untitled pattern)");
 			else
-				ImGui::Text("%s", pattern.getPatternName().c_str());
+				ImGui::Text("Opened pattern: %s", pattern.getPatternName().c_str());
 
 			if (ImGui::Button("New"))
 				requestSaveAndCallback([]() { pattern = Pattern{}; });
@@ -550,7 +571,9 @@ int main() {
 				saveAsName = pattern.getPatternName();
 			}
 
-
+			ImGui::SameLine();
+			if (ImGui::Button("Refresh"))
+				refreshDirectory();
 
 
 			ImGui::Separator();
@@ -566,13 +589,10 @@ int main() {
 			ImGui::SameLine();
 			if (ImGui::Button("Reload")) 
 				reloadAudio();
-			
-
-			/*if (ImGui::InputFloat("Tempo", &bpm, 1.0f, 5.0f, "%.3f BPM") || ImGui::InputInt("Beats per bar", &sig, 1, 2)) {
-				pattern.applyAction<UpdateSongAction>(song_name);
-			}*/
 
 			ImGui::Separator();
+			ImGui::Text("Config");
+
 			ImGui::InputText("Res:// folder", &Pattern::res_path);
 		}
 		ImGui::End();
@@ -700,6 +720,28 @@ int main() {
 		}
 		ImGui::End();
 		
+
+		if (helpPanelOpen) {
+			if (ImGui::Begin("Help Panel", &helpPanelOpen)) {
+				ImGui::Text("CDPATedit - by Ash Taylor");
+				ImGui::Separator();
+				ImGui::Text(R"RAWTEXT(Instructions:
+Left-click on the highway to place notes.
+Right-click to remove notes.
+
+Use Ctrl+Mousewheel to add/remove holds.
+
+To load music, enter the RhythmStream name into 
+	Pattern > Song name.
+
+(Example: res://music/rhythm/tutorial.tres
+is loaded by entering "tutorial".)
+
+)RAWTEXT");
+			}
+			ImGui::End();
+		}
+
 		
 
 		if (saveAsMenu) {
@@ -711,6 +753,7 @@ int main() {
 				if (ImGui::Button("Save")) {
 					pattern.setPatternName(saveAsName);
 					pattern.saveToFile();
+					refreshDirectory();
 					saveAsMenu = false;
 				}
 				ImGui::PopItemWidth();
@@ -732,6 +775,7 @@ int main() {
 				
 				if (ImGui::Button("Save")) {
 					pattern.saveToFile();
+					refreshDirectory();
 					unsavedChangesWindow = false;
 					unsavedChangesCallback();
 				}

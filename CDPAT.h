@@ -79,9 +79,16 @@ namespace cdpat {
 			return events[beat].end();
 		}
 
+		void reset() {
+			events.clear();
+			actions_stack.clear();
+			action_index = -1;
+			name = "";
+			unsaved_changes = false;
+		}
 
 		bool loadFromFile(const std::string& filepath) {
-			events.clear();
+			reset();
 
 			std::cout << "Loading from " << filepath << "...\nres:// folder: " << res_path << "\n";
 

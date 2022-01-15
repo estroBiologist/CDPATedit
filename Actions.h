@@ -36,7 +36,15 @@ namespace cdpat {
 
 			if (hold_length > 0.0f)
 				note.args.push_back(hold_length);
+
+			auto& events_beat = getEventsData(pattern)[beat];
 			
+			assert(std::find_if(
+				events_beat.begin(), 
+				events_beat.end(), 
+				[&](const BeatEvent& x) { return x.type == note.type && x.args[0] == note.args[0]; }) == events_beat.end()
+			);
+
 			getEventsData(pattern)[beat].push_back(note);
 		}
 		
