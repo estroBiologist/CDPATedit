@@ -67,8 +67,92 @@ void refreshDirectory() {
 }
 
 void reloadAudio() {
+	std::string resource_path = cdpat::Pattern::res_path + "music/rhythm/" + pattern.song_name + ".tres";
+	std::cout << "Loading rhythm data from " << resource_path << "\n";
+	//Load rhythm data
+	std::ifstream ifs(resource_path);
 
-	mus.loadFromFile(pattern.getSongPath());
+
+	//Fucking christ we have to parse .tres files
+	std::unordered_map<int, std::string> ext_resources;
+	std::unordered_map < std::string, std::string> properties;
+
+	while (ifs) {
+
+		//Debug
+
+		std::string token;
+		ifs >> token;
+		
+		
+
+		// Parse external resources
+		if (token == "[gd_resource") {
+			std::string junk;
+			ifs >> junk; ifs >> junk; ifs >> junk;
+			
+			continue;
+
+		} else if (token == "[ext_resource") {
+			std::string path, type, id;
+			ifs >> path; ifs >> type; ifs >> id;
+
+			if (type == "type=\"AudioStream\"") {
+				id = id.substr(3);
+				id = id.substr(0, id.find("]"));
+				int id_num = std::stoi(id);
+
+				path = path.substr(std::string("path=\"res://").length());
+				path.pop_back(); // Remove trailing quote
+
+				ext_resources[id_num] = path;
+			}
+
+			continue;
+		}
+
+		if (token == "[resource]") {
+			while (ifs) {
+				std::string junk, name;
+				
+				ifs >> name;
+				ifs >> junk;
+
+				std::string val;
+
+				ifs >> val;
+
+				if (val == "ExtResource(") {
+					ifs >> val; // value
+					ifs >> junk; // ")"
+					assert(junk == ")");
+				} else if (val == "[") {
+					std::string accum;
+					
+					do {
+						ifs >> accum;
+						val += accum;
+					} 
+					while (ifs && accum != "]");
+				}
+
+				properties[name] = val;
+			}
+		}
+
+		pattern.bpm = std::stof(properties.at("bpm"));
+		pattern.sig = std::stoi(properties.at("beats_per_bar"));
+
+		break;
+	}
+
+	std::string song_path = cdpat::Pattern::res_path + ext_resources.at(std::stoi(properties.at("stream")));
+
+	std::cout << "Loading audio stream from file " << song_path << "\n";
+	if (!mus.loadFromFile(song_path)) {
+		std::cout << "Failed loading stream, aborting music load\n";
+		return;
+	}
 	mus_player.setBuffer(mus);
 	mus_player.play();
 	mus_player.pause();
@@ -79,6 +163,8 @@ void loadPattern(std::string file) {
 	pattern.load(file); 
 	reloadAudio();
 }
+
+
 
 int main() {
 	using namespace cdpat;
