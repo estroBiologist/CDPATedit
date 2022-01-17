@@ -13,7 +13,7 @@ namespace cdpat {
 
 	static inline const int CDPAT_VERSION = 150;
 
-	static inline size_t MAX_ACTION_HISTORY = 100;
+	static inline size_t MAX_ACTION_HISTORY = 250;
 	
 	const std::array<std::string, 4> BEAT_EVENT_TYPES { "note", "hit", "dialog", "target"};
 
@@ -289,10 +289,11 @@ namespace cdpat {
 			if (action_index + 1 < actions_stack.size())
 				actions_stack.resize(action_index + 1);
 
-			while (actions_stack.size() > MAX_ACTION_HISTORY) 
+			while (actions_stack.size() > MAX_ACTION_HISTORY) {
 				actions_stack.pop_front();
+				action_index -= 1;
+			}
 			
-
 			action->apply(*this);
 			std::cout << "Apply action: " << action->getDescription() << "\n";
 

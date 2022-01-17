@@ -164,6 +164,19 @@ void loadPattern(std::string file) {
 	reloadAudio();
 }
 
+void locateResFolder() {
+	const char* filters[] = { "project.godot" };
+	auto path_cstr = tinyfd_openFileDialog("Open project.godot file...", pattern.res_path.c_str(), 1, filters, "CHORDIOID Godot Project (project.godot)", 0);
+	if (path_cstr) {
+		std::string path{ path_cstr };
+
+		std::replace(path.begin(), path.end(), '\\', '/');
+
+		auto folder_ind = path.find_last_of("/");
+		path = path.substr(0, folder_ind + 1);
+		cdpat::Pattern::res_path = path;
+	}
+}
 
 
 int main() {
@@ -196,8 +209,6 @@ int main() {
 	
 	Pattern::res_path = "G:/Godot/CHORDIOID/";
 	refreshDirectory();
-	//pattern.load("test_rhythmbased");
-
 	
 	/*mus.loadFromFile(pattern.getSongPath());
 	mus_player.setBuffer(mus);
@@ -491,16 +502,7 @@ int main() {
 				}
 
 				if (ImGui::MenuItem("Locate CHORDIOID folder...")) {
-					const char* filters[] = { "project.godot" };
-					auto path_cstr = tinyfd_openFileDialog("Open project.godot file...", pattern.res_path.c_str(), 1, filters, "CHORDIOID Godot Project (project.godot)", 0);
-					if (path_cstr) {
-						std::string path{ path_cstr };
-						auto folder_ind = path.find_last_of("/");
-						if (folder_ind == -1)	
-							folder_ind = path.find_last_of("\\");
-						path = path.substr(0, folder_ind + 1);
-						Pattern::res_path = path;
-					}
+					locateResFolder();
 				}
 
 				ImGui::Separator();
@@ -575,14 +577,18 @@ int main() {
 			if (ImGui::Button("Refresh"))
 				refreshDirectory();
 
-
+			ImGui::Text("");
 			ImGui::Separator();
 
+			ImGui::Text("Music");
+			// Song data
 			std::string song_name = pattern.song_name;
 			int sig = pattern.sig;
 			float bpm = pattern.bpm;
 
-			if (ImGui::InputText("Song name", &song_name)) {
+			ImGui::PushItemWidth(ImGui::GetWindowWidth() / 2.0);
+
+			if (ImGui::InputText("Stream name", &song_name)) {
 				pattern.applyAction<UpdateSongAction>(song_name);
 			}
 
@@ -590,10 +596,30 @@ int main() {
 			if (ImGui::Button("Reload")) 
 				reloadAudio();
 
-			ImGui::Separator();
-			ImGui::Text("Config");
+			ImGui::PopItemWidth();
 
-			ImGui::InputText("Res:// folder", &Pattern::res_path);
+			ImGui::Text("");
+			ImGui::Separator();
+
+			ImGui::Text("Configuration");
+
+			// General config
+			ImGui::PushItemWidth(ImGui::GetWindowWidth() / 2.0);
+			ImGui::InputText("Res:// folder", &Pattern::res_path, ImGuiInputTextFlags_ReadOnly);
+			ImGui::SameLine();
+			if (ImGui::Button("Locate"))
+				locateResFolder();
+
+#if INTPTR_MAX == INT32_MAX
+			auto size_t_len = ImGuiDataType_U32;
+#elif
+			auto size_t_len = ImGuiDataType_U64;
+#endif
+			const size_t step = 1U;
+
+			ImGui::InputScalar("Max undo levels", size_t_len, &MAX_ACTION_HISTORY, &step);
+
+			ImGui::PopItemWidth();
 		}
 		ImGui::End();
 
