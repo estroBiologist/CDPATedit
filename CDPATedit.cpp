@@ -2,6 +2,7 @@
 #include <functional>
 #include <filesystem>
 
+
 #include <SFML/Graphics.hpp>
 #include <SFML/System.hpp>
 #include <SFML/Audio.hpp>
@@ -21,7 +22,12 @@
 #include <Windows.h>
 #endif
 
-
+struct Stem {
+	sf::SoundBuffer buffer{};
+	sf::Sound player{};
+	bool active = true;
+	std::string name = "";
+};
 
 bool unsavedChangesWindow = false;
 std::function<void()> unsavedChangesCallback;
@@ -29,9 +35,16 @@ cdpat::Pattern pattern{};
 std::vector<std::string> directory{};
 sf::SoundBuffer mus{};
 sf::Sound mus_player{};
+std::vector<Stem> stems;
+
 bool resFolderFound = false;
 bool helpPanelOpen = false;
 std::string godot_path = "";
+
+
+
+
+
 
 void requestSaveAndCallback(std::function<void()>&& callback) {
 	if (pattern.hasUnsavedChanges()) {
@@ -205,6 +218,27 @@ void reloadAudio() {
 	mus_player.play();
 	mus_player.pause();
 	mus_player.setPlayingOffset(sf::Time{});
+
+
+	// Hacky array parsing Lol
+	std::string stems_txt = properties.at("stems");
+	
+	while (!stems_txt.empty()) {
+		stems_txt = stems_txt.substr(std::string{ "[ExtResource(" }.length());
+		std::string index_txt = stems_txt.substr(0, stems_txt.find(")"));
+		int index = std::stoi(index_txt);
+		stems_txt = stems_txt.substr(index_txt.length() + 2); // num + )]
+
+		Stem& stem = stems.emplace_back();
+		stem.name = ext_resources.at(index);
+		stem.buffer.loadFromFile(cdpat::Pattern::res_path + ext_resources.at(index));
+		stem.player.setBuffer(stem.buffer);
+		stem.player.play();
+		stem.player.pause();
+		stem.player.setPlayingOffset(sf::Time{});
+	}
+
+
 }
 
 void loadPattern(std::string file) {
@@ -227,12 +261,47 @@ void locateResFolder() {
 	}
 }
 
+bool playing = false;
 
-void runGame(bool startBattle = true) {
-
+void startPlayback() {
+	playing = true;
+	mus_player.play();
+	for (auto& stem : stems)
+		if (stem.active)
+			stem.player.play();
 }
 
+void stopPlayback() {
+	playing = false;
+	mus_player.pause();
+	mus_player.setPlayingOffset(sf::Time{});
+	for (auto& stem : stems) {
+		stem.player.pause();
+		stem.player.setPlayingOffset(sf::Time{});
+	}
+}
 
+void pausePlayback() {
+	playing = false;
+	mus_player.pause();
+	for (auto& stem : stems)
+		stem.player.pause();
+}
+
+void togglePlayback() {
+	playing = !playing;
+	if (playing) 
+		startPlayback();
+	else 
+		pausePlayback();
+}
+
+void setPlayingPosition(sf::Time position) {
+	mus_player.setPlayingOffset(position);
+	for (auto& stem : stems) 
+		stem.player.setPlayingOffset(position);
+	
+}
 int main() {
 	using namespace cdpat;
 	const std::array<std::string, 3> TOOLS {"Select", "Place", "Erase"};
@@ -275,7 +344,7 @@ int main() {
 	//sf::Texture waveformTexture{};
 	//waveformTexture.loadFromImage(waveform);
 	
-	bool playing = false;
+	//bool playing = false;
 	
 	float scroll_y = 0.0f;
 	float scroll_y_goal = -0.5f;
@@ -465,9 +534,7 @@ int main() {
 					
 					switch (w_event.key.code) {
 						case Keyboard::Space:
-							playing = !playing;
-							if (playing) mus_player.play();
-							else mus_player.pause();
+							togglePlayback();
 							break;
 
 						default:
@@ -488,7 +555,7 @@ int main() {
 		// Update
 		
 		if (sf::Mouse::isButtonPressed(sf::Mouse::Left) && mousePosMapped.x < 0.0f) {
-			mus_player.setPlayingOffset(sf::seconds(beatsToSecs(beat, pattern.bpm)));
+			setPlayingPosition(sf::seconds(beatsToSecs(beat, pattern.bpm)));
 			//TODO: Scroll at top and bottom of screen
 		}
 		
@@ -514,7 +581,7 @@ int main() {
 
 		auto playback_col = sf::Color::White;
 
-		if (mus_player.getStatus() == sf::Sound::Playing)
+		if (playing)
 			playback_col = sf::Color::Green;
 
 		float playback_position = secsToBeats(mus_player.getPlayingOffset().asSeconds(), pattern.bpm);
@@ -652,10 +719,15 @@ int main() {
 				if (ImGui::Button("Refresh"))
 					refreshDirectory();
 
+
+
 				ImGui::Text("");
 				ImGui::Separator();
 
+
+
 				ImGui::Text("Music");
+
 				// Song data
 				std::string song_name = pattern.song_name;
 				int sig = pattern.sig;
@@ -672,9 +744,21 @@ int main() {
 					reloadAudio();
 
 				ImGui::PopItemWidth();
+
+				ImGui::Text("Stems");
+				
+				for (auto& stem: stems) {
+					ImGui::Separator();
+					ImGui::Text("%s", stem.name.c_str());
+
+					if (ImGui::Checkbox("Active", &stem.active))
+						pausePlayback();
+				}
 			}
 		}
 		ImGui::End();
+
+
 
 		if (ImGui::Begin("Configuration")) {
 
@@ -756,21 +840,15 @@ int main() {
 		if (ImGui::Begin("Tools")) {
 			ImGui::Text("Playback");
 		
-			if (ImGui::Button(playing ? "Pause" : "Play")) {
-				playing = !playing;
-				
-				if (playing) mus_player.play();
-				else mus_player.pause();
-			}
+			if (ImGui::Button(playing ? "Pause" : "Play")) 
+				togglePlayback();
+			
 			
 			ImGui::SameLine();
 			
-			if (ImGui::Button("Stop")) {
-				playing = false;
-				// Pause at 0 instead of stopping so we can still move the play position
-				mus_player.pause();
-				mus_player.setPlayingOffset(sf::Time{});
-			}
+			if (ImGui::Button("Stop")) 
+				stopPlayback();
+			
 			
 			
 			ImGui::Separator();
