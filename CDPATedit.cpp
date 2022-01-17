@@ -222,27 +222,35 @@ void reloadAudio() {
 
 	// Hacky array parsing Lol
 	std::string stems_txt = properties.at("stems");
-	
-	while (!stems_txt.empty()) {
-		stems_txt = stems_txt.substr(std::string{ "[ExtResource(" }.length());
-		std::string index_txt = stems_txt.substr(0, stems_txt.find(")"));
-		int index = std::stoi(index_txt);
-		stems_txt = stems_txt.substr(index_txt.length() + 2); // num + )]
+	if (stems_txt != "[]") {
+		while (!stems_txt.empty()) {
+			stems_txt = stems_txt.substr(std::string{ "[ExtResource(" }.length());
+			std::string index_txt = stems_txt.substr(0, stems_txt.find(")"));
+			int index = std::stoi(index_txt);
+			stems_txt = stems_txt.substr(index_txt.length() + 2); // num + )]
 
-		Stem& stem = stems.emplace_back();
-		stem.name = ext_resources.at(index);
-		stem.buffer.loadFromFile(cdpat::Pattern::res_path + ext_resources.at(index));
-		stem.player.setBuffer(stem.buffer);
-		stem.player.play();
-		stem.player.pause();
-		stem.player.setPlayingOffset(sf::Time{});
+			Stem& stem = stems.emplace_back();
+			stem.name = ext_resources.at(index);
+			stem.buffer.loadFromFile(cdpat::Pattern::res_path + ext_resources.at(index));
+			stem.player.setBuffer(stem.buffer);
+			stem.player.play();
+			stem.player.pause();
+			stem.player.setPlayingOffset(sf::Time{});
+		}
 	}
 
 
 }
 
+void newPattern() {
+	stems.clear();
+	pattern = cdpat::Pattern{};
+}
+
+
 void loadPattern(std::string file) {
-	pattern.load(file); 
+	pattern.load(file);
+	stems.clear();
 	reloadAudio();
 }
 
@@ -331,28 +339,12 @@ int main() {
 	
 	loadSettings();
 	refreshDirectory();
-	
-	/*mus.loadFromFile(pattern.getSongPath());
-	mus_player.setBuffer(mus);
-	mus_player.play();
-	mus_player.pause();
-	mus_player.setPlayingOffset(sf::Time{});
-	*/
-	//sf::Image waveform{};
-	//generateAudioWaveform(mus, waveform, sf::Vector2u(200, 10000));
-	
-	//sf::Texture waveformTexture{};
-	//waveformTexture.loadFromImage(waveform);
+
 	
 	//bool playing = false;
 	
 	float scroll_y = 0.0f;
 	float scroll_y_goal = -0.5f;
-	
-	
-	// TODO: Calculate
-	float min_visible_beat = -16.0f;
-	float max_visible_beat = 48.0f;
 	
 	
 	float start_offset = 256.0f;
@@ -606,7 +598,7 @@ int main() {
 		{
 			if (ImGui::BeginMenu("File")) {
 				if (ImGui::MenuItem("New")) {
-					requestSaveAndCallback([&]() { pattern = Pattern{}; });
+					requestSaveAndCallback(newPattern);
 				}
 
 				ImGui::Separator();
@@ -697,7 +689,7 @@ int main() {
 					ImGui::Text("Opened pattern: %s", pattern.getPatternName().c_str());
 
 				if (ImGui::Button("New"))
-					requestSaveAndCallback([]() { pattern = Pattern{}; });
+					requestSaveAndCallback(newPattern);
 
 				ImGui::SameLine();
 				if (ImGui::Button("Save")) {
@@ -749,10 +741,22 @@ int main() {
 				
 				for (auto& stem: stems) {
 					ImGui::Separator();
+					ImGui::PushID(stem.name.c_str());
 					ImGui::Text("%s", stem.name.c_str());
 
 					if (ImGui::Checkbox("Active", &stem.active))
 						pausePlayback();
+
+					ImGui::PlotLines("##Waveform", 
+						[](void* stem, int index) { 
+							auto& buffer = static_cast<Stem*>(stem)->buffer;
+							constexpr int scale = 50000;
+							return static_cast<float>(buffer.getSamples()[index * scale]);
+						}, 
+						static_cast<void*>(&stem),
+						stem.buffer.getSampleCount() / 50000);
+
+					ImGui::PopID();
 				}
 			}
 		}
@@ -993,6 +997,11 @@ is loaded by entering "tutorial".)
 		
 		//Rendering
 		
+
+		float min_visible_beat = -4.0f;
+		float max_visible_beat = window.getSize().y / y_scale;
+
+
 		window.clear();
 		
 		
