@@ -28,6 +28,8 @@ cdpat::Pattern pattern{};
 std::vector<std::string> directory{};
 sf::SoundBuffer mus{};
 sf::Sound mus_player{};
+bool resFolderFound = false;
+bool helpPanelOpen = false;
 
 void requestSaveAndCallback(std::function<void()>&& callback) {
 	if (pattern.hasUnsavedChanges()) {
@@ -51,10 +53,51 @@ float lerp(float a, float b, float t) {
 }
 
 
-void refreshDirectory() {
-	if (cdpat::Pattern::res_path.empty())
+void saveSettings() {
+	std::ofstream ofs(".config");
+
+	if (!ofs) {
+		std::cout << "Error: failed to open .config file for writing\n";
 		return;
+	}
+
+	ofs << cdpat::Pattern::res_path << "\n";
+	ofs << helpPanelOpen << "\n";
+	ofs << cdpat::MAX_ACTION_HISTORY << "\n";
+}
+
+void loadSettings() {
+	std::ifstream ifs(".config");
+
+	if (!ifs) {
+		std::cout << "Note: no .config file found. Using default settings";
+		return;
+	}
+
+	std::getline(ifs, cdpat::Pattern::res_path);
+	ifs >> helpPanelOpen;
+	ifs >> cdpat::MAX_ACTION_HISTORY;
+}
+
+void refreshDirectory() {
+	resFolderFound = false;
+
+	if (cdpat::Pattern::res_path.empty()) {
+		std::cout << "Error: no res:// folder specified.";
+		return;
+	}
 	directory.clear();
+
+	if (!std::filesystem::exists(cdpat::Pattern::res_path + "project.godot")) {
+		std::cout << "Error: specified res:// folder is not a valid Godot project.";
+		return;
+	}
+
+	if (!std::filesystem::is_directory(cdpat::Pattern::res_path + "patterns/")) {
+		std::cout << "Error: specified res:// folder is not a valid CHORDIOID project.";
+		return;
+	}
+
 	for (const auto& entry : std::filesystem::directory_iterator(cdpat::Pattern::res_path + "patterns/")) {
 		if (entry.is_regular_file()) {
 			std::string filename = entry.path().filename().string();
@@ -64,6 +107,7 @@ void refreshDirectory() {
 				directory.push_back(filename.substr(0, ext_start));
 		}
 	}
+	resFolderFound = true;
 }
 
 void reloadAudio() {
@@ -175,6 +219,7 @@ void locateResFolder() {
 		auto folder_ind = path.find_last_of("/");
 		path = path.substr(0, folder_ind + 1);
 		cdpat::Pattern::res_path = path;
+		refreshDirectory();
 	}
 }
 
@@ -188,7 +233,6 @@ int main() {
 	
 	sf::ContextSettings settings;
 	settings.antialiasingLevel = 8;
-	
 	
 	sf::RenderWindow window(sf::VideoMode(1280, 720), "CDPATedit", sf::Style::Default | sf::Style::Resize, settings);
 	window.setVerticalSyncEnabled(true);
@@ -207,7 +251,7 @@ int main() {
 	sf::Font ubuntuLight;
 	ubuntuLight.loadFromFile("Resources/Ubuntu-Light.ttf");
 	
-	Pattern::res_path = "G:/Godot/CHORDIOID/";
+	loadSettings();
 	refreshDirectory();
 	
 	/*mus.loadFromFile(pattern.getSongPath());
@@ -476,7 +520,6 @@ int main() {
 		static bool saveAsMenu = false;
 		static std::string saveAsName = "";
 
-		static bool helpPanelOpen = false;
 		// ImGui
 	
 		ImGui::SFML::Update(window, deltaClock.restart());
@@ -487,10 +530,10 @@ int main() {
 				if (ImGui::MenuItem("New")) {
 					requestSaveAndCallback([&]() { pattern = Pattern{}; });
 				}
-				
+
 				ImGui::Separator();
-				
-				if (ImGui::MenuItem("Save", "Ctrl+S")) {
+
+				if (ImGui::MenuItem("Save", "Ctrl+S", nullptr, resFolderFound)) {
 					if (pattern.getPatternName().empty()) {
 						saveAsMenu = true;
 						saveAsName = "";
@@ -500,6 +543,12 @@ int main() {
 						refreshDirectory();
 					}
 				}
+				if (ImGui::MenuItem("Save as...", nullptr, nullptr, resFolderFound)) {
+					saveAsMenu = true;
+					saveAsName = "";
+				}
+
+				ImGui::Separator();
 
 				if (ImGui::MenuItem("Locate CHORDIOID folder...")) {
 					locateResFolder();
@@ -535,75 +584,78 @@ int main() {
 		}
 
 		if (ImGui::Begin("Pattern")) {
-			ImGui::Text("Pattern list (click to open):");
-			ImGui::PushItemWidth(-1);
-			if (ImGui::BeginListBox("##Directory")) {
-
-				for (const auto& file : directory) {
-					if (ImGui::Selectable(file.c_str(), file == pattern.getPatternName()))
-						requestSaveAndCallback([&]() { loadPattern(file); });
-				}
-				ImGui::EndListBox();
+			if (!resFolderFound) {
+				ImGui::Text("Please locate the CHORDIOID project folder.");
 			}
-			ImGui::PopItemWidth();
+			else {
+				ImGui::Text("Pattern list (click to open):");
+				ImGui::PushItemWidth(-1);
+				if (ImGui::BeginListBox("##Directory")) {
 
-			bool patternUntitled = pattern.getPatternName().empty();
-
-			if (patternUntitled)
-				ImGui::Text("Opened pattern: (Untitled pattern)");
-			else
-				ImGui::Text("Opened pattern: %s", pattern.getPatternName().c_str());
-
-			if (ImGui::Button("New"))
-				requestSaveAndCallback([]() { pattern = Pattern{}; });
-
-			ImGui::SameLine();
-			if (ImGui::Button("Save")) {
-				if (patternUntitled) {
-					saveAsMenu = true;
-					saveAsName = "";
+					for (const auto& file : directory) {
+						if (ImGui::Selectable(file.c_str(), file == pattern.getPatternName()))
+							requestSaveAndCallback([&]() { loadPattern(file); });
+					}
+					ImGui::EndListBox();
 				}
+				ImGui::PopItemWidth();
+
+				bool patternUntitled = pattern.getPatternName().empty();
+
+				if (patternUntitled)
+					ImGui::Text("Opened pattern: (Untitled pattern)");
 				else
-					pattern.saveToFile();
+					ImGui::Text("Opened pattern: %s", pattern.getPatternName().c_str());
+
+				if (ImGui::Button("New"))
+					requestSaveAndCallback([]() { pattern = Pattern{}; });
+
+				ImGui::SameLine();
+				if (ImGui::Button("Save")) {
+					if (patternUntitled) {
+						saveAsMenu = true;
+						saveAsName = "";
+					}
+					else
+						pattern.saveToFile();
+				}
+
+				ImGui::SameLine();
+				if (ImGui::Button("Save as...")) {
+					saveAsMenu = true;
+					saveAsName = pattern.getPatternName();
+				}
+
+				ImGui::SameLine();
+				if (ImGui::Button("Refresh"))
+					refreshDirectory();
+
+				ImGui::Text("");
+				ImGui::Separator();
+
+				ImGui::Text("Music");
+				// Song data
+				std::string song_name = pattern.song_name;
+				int sig = pattern.sig;
+				float bpm = pattern.bpm;
+
+				ImGui::PushItemWidth(ImGui::GetWindowWidth() / 2.0);
+
+				if (ImGui::InputText("Stream name", &song_name)) {
+					pattern.applyAction<UpdateSongAction>(song_name);
+				}
+
+				ImGui::SameLine();
+				if (ImGui::Button("Reload"))
+					reloadAudio();
+
+				ImGui::PopItemWidth();
 			}
+		}
+		ImGui::End();
 
-			ImGui::SameLine();
-			if (ImGui::Button("Save as...")) {
-				saveAsMenu = true;
-				saveAsName = pattern.getPatternName();
-			}
+		if (ImGui::Begin("Configuration")) {
 
-			ImGui::SameLine();
-			if (ImGui::Button("Refresh"))
-				refreshDirectory();
-
-			ImGui::Text("");
-			ImGui::Separator();
-
-			ImGui::Text("Music");
-			// Song data
-			std::string song_name = pattern.song_name;
-			int sig = pattern.sig;
-			float bpm = pattern.bpm;
-
-			ImGui::PushItemWidth(ImGui::GetWindowWidth() / 2.0);
-
-			if (ImGui::InputText("Stream name", &song_name)) {
-				pattern.applyAction<UpdateSongAction>(song_name);
-			}
-
-			ImGui::SameLine();
-			if (ImGui::Button("Reload")) 
-				reloadAudio();
-
-			ImGui::PopItemWidth();
-
-			ImGui::Text("");
-			ImGui::Separator();
-
-			ImGui::Text("Configuration");
-
-			// General config
 			ImGui::PushItemWidth(ImGui::GetWindowWidth() / 2.0);
 			ImGui::InputText("Res:// folder", &Pattern::res_path, ImGuiInputTextFlags_ReadOnly);
 			ImGui::SameLine();
@@ -757,6 +809,8 @@ Right-click to remove notes.
 
 Use Ctrl+Mousewheel to add/remove holds.
 
+Hold Alt to disable snapping.
+
 To load music, enter the RhythmStream name into 
 	Pattern > Song name.
 
@@ -773,6 +827,8 @@ is loaded by entering "tutorial".)
 		if (saveAsMenu) {
 			if (ImGui::Begin("Save as...")) {
 				
+				
+				ImGui::Text("Please specify a pattern name.");
 				ImGui::InputText("##Name", &saveAsName);
 
 				ImGui::PushItemWidth(-1);
@@ -984,4 +1040,6 @@ is loaded by entering "tutorial".)
 		ImGui::SFML::Render(window);
 		window.display();
 	}
+
+	saveSettings();
 }
