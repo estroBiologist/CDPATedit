@@ -15,6 +15,7 @@
 
 #include "tinyfiledialogs.h"
 
+#include "LICENSES.h"
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -30,6 +31,7 @@ sf::SoundBuffer mus{};
 sf::Sound mus_player{};
 bool resFolderFound = false;
 bool helpPanelOpen = false;
+std::string godot_path = "";
 
 void requestSaveAndCallback(std::function<void()>&& callback) {
 	if (pattern.hasUnsavedChanges()) {
@@ -62,6 +64,7 @@ void saveSettings() {
 	}
 
 	ofs << cdpat::Pattern::res_path << "\n";
+	ofs << godot_path << "\n";
 	ofs << helpPanelOpen << "\n";
 	ofs << cdpat::MAX_ACTION_HISTORY << "\n";
 }
@@ -75,6 +78,7 @@ void loadSettings() {
 	}
 
 	std::getline(ifs, cdpat::Pattern::res_path);
+	std::getline(ifs, godot_path);
 	ifs >> helpPanelOpen;
 	ifs >> cdpat::MAX_ACTION_HISTORY;
 }
@@ -221,6 +225,11 @@ void locateResFolder() {
 		cdpat::Pattern::res_path = path;
 		refreshDirectory();
 	}
+}
+
+
+void runGame(bool startBattle = true) {
+
 }
 
 
@@ -520,6 +529,8 @@ int main() {
 		static bool saveAsMenu = false;
 		static std::string saveAsName = "";
 
+		static bool licensesPanelOpen = false;
+
 		// ImGui
 	
 		ImGui::SFML::Update(window, deltaClock.restart());
@@ -563,9 +574,21 @@ int main() {
 				
 				ImGui::EndMenu();
 			}
+			
 			if (ImGui::BeginMenu("Edit")) {
 				if (ImGui::MenuItem("Undo", "Ctrl+Z", false, pattern.canUndo())) pattern.undo();
 				if (ImGui::MenuItem("Redo", "Ctrl+Y", false, pattern.canRedo())) pattern.redo();
+				ImGui::EndMenu();
+			}
+
+			if (ImGui::BeginMenu("Run")) {
+				if (ImGui::MenuItem("Run battle...")) {
+				}
+				if (ImGui::MenuItem("Run CHORDIOID...")) {
+					std::string command = "\"" + godot_path + "\" --path \"" + Pattern::res_path + "\"";
+					system(("\"start \"\" " + command + "\"").c_str());
+				}
+
 				ImGui::EndMenu();
 			}
 
@@ -573,14 +596,13 @@ int main() {
 				if (ImGui::MenuItem("Show Help Panel"))
 					helpPanelOpen = true;
 
+				if (ImGui::MenuItem("License Info"))
+					licensesPanelOpen = true;
+
 				ImGui::EndMenu();
 			}
 			ImGui::EndMainMenuBar();
 
-			//if (ImGui::BeginMenu("Run")) {
-			//	if (ImGui::MenuItem("Launch CHORDIOID...", nullptr, false, !pattern.res_path.empty()))
-			//		system(pattern.res_path+"")
-			//}
 		}
 
 		if (ImGui::Begin("Pattern")) {
@@ -661,6 +683,8 @@ int main() {
 			ImGui::SameLine();
 			if (ImGui::Button("Locate"))
 				locateResFolder();
+			
+			ImGui::InputText("Godot path", &godot_path);
 
 #if INTPTR_MAX == INT32_MAX
 			auto size_t_len = ImGuiDataType_U32;
@@ -877,6 +901,12 @@ is loaded by entering "tutorial".)
 		}
 		
 		
+		if (licensesPanelOpen) {
+			if (ImGui::Begin("License Info", &licensesPanelOpen))
+				ImGui::Text("%s", LICENSE_INFO);
+			ImGui::End();
+		}
+
 		
 
 		
@@ -1043,3 +1073,4 @@ is loaded by entering "tutorial".)
 
 	saveSettings();
 }
+
