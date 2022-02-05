@@ -275,8 +275,10 @@ void startPlayback() {
 	playing = true;
 	mus_player.play();
 	for (auto& stem : stems)
-		if (stem.active)
+		if (stem.active) {
 			stem.player.play();
+			stem.player.setPlayingOffset(mus_player.getPlayingOffset());
+		}
 }
 
 void stopPlayback() {
@@ -315,7 +317,7 @@ int main() {
 	const std::array<std::string, 3> TOOLS {"Select", "Place", "Erase"};
 	
 	
-	std::cout << "CDPATedit - By Ash Declan Taylor\nSupported CDPAT version: " << cdpat::CDPAT_VERSION << "\n";
+	std::cout << "CDPATedit - By Ash Taylor\nSupported CDPAT version: " << cdpat::CDPAT_VERSION << "\n";
 	
 	sf::ContextSettings settings;
 	settings.antialiasingLevel = 8;
