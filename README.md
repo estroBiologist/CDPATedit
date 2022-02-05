@@ -2,6 +2,10 @@
 
 Editor for CHORDIOID's beatmap format, `.cdpat`.
 
+## Downloading
+
+Head over to [Releases](https://gitlab.com/estroBiologist/CDPATedit/-/releases)! Assuming I've remembered to update it regularly, that is.
+
 ## Compiling from source
 
 This repo is a Visual Studio 2022 project, and uses [vcpkg](https://vcpkg.io/en/index.html) for its dependencies.
