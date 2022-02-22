@@ -615,6 +615,9 @@ int main() {
 							togglePlayback();
 							break;
 
+						case Keyboard::Delete:
+							if (!selectedNotes.empty())
+								pattern.applyAction<NoteAction>(selectedNotes, false);
 						default:
 							break;
 					}
@@ -729,6 +732,18 @@ int main() {
 			if (ImGui::BeginMenu("Edit")) {
 				if (ImGui::MenuItem("Undo", "Ctrl+Z", false, pattern.canUndo())) pattern.undo();
 				if (ImGui::MenuItem("Redo", "Ctrl+Y", false, pattern.canRedo())) pattern.redo();
+
+				ImGui::Separator();
+
+				ImGui::MenuItem("Cut", "Ctrl+X", false);
+				ImGui::MenuItem("Copy", "Ctrl+C", false);
+				ImGui::MenuItem("Paste", "Ctrl+V", false);
+
+				ImGui::Separator();
+
+				if (ImGui::MenuItem("Delete", "Del", false, !selectedNotes.empty()))
+					pattern.applyAction<NoteAction>(selectedNotes, false);
+					
 				ImGui::EndMenu();
 			}
 
