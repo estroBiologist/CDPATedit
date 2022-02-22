@@ -7,6 +7,7 @@
 #include <string>
 #include <iostream>
 #include <deque>
+#include <memory>
 
 namespace cdpat {
 	class Pattern;

@@ -1,6 +1,7 @@
 #include <iostream>
 #include <functional>
 #include <filesystem>
+#include <cmath>
 
 
 #include <SFML/Graphics.hpp>
@@ -365,9 +366,20 @@ int main() {
 	};
 	
 	Tool currentTool = Tool::Place;
-	
+
+	sf::Clock framerateClock;
+	unsigned framecount = 0;
+	unsigned last_framecount = 0;
 	sf::Clock deltaClock;
 	while (window.isOpen()) {
+
+		if (framerateClock.getElapsedTime().asSeconds() > 1.0f) {
+			last_framecount = framecount;
+			framecount = 0;
+			framerateClock.restart();
+		}
+
+
 		auto mousePosMapped = sf::Vector2f(sf::Mouse::getPosition(window));
 		mousePosMapped.x -= start_offset;
 		mousePosMapped.x /= lane_offset;
@@ -400,25 +412,38 @@ int main() {
 		auto low = events.lower_bound(mousePosMapped.y);
 		const float threshold = .5f;
 		float closest = -1.0f;
-
+		float distA = INFINITY;
+		float distB = INFINITY;
+		cdpat::EventsData::const_iterator iterA;
+		cdpat::EventsData::const_iterator iterB;
 		if (low != events.end()) {
 			//If `low` is the first event, prev is invalid
 			auto prev = low == events.begin() ? events.end() : std::prev(low);
 
 			// Distance to note below cursor
-			float distA = std::abs(low->first - mousePosMapped.y);
+			distA = std::abs(low->first - mousePosMapped.y);
 
-			float distB = prev != events.end() ? std::abs(prev->first - mousePosMapped.y) : INFINITY;
+			distB = prev != events.end() ? std::abs(prev->first - mousePosMapped.y) : INFINITY;
 			
-			bool isPrevClosest = distB < distA;
-
-			if (distA < threshold || distB < threshold) {
-				if (isPrevClosest)
-					closest = prev->first;
-				else
-					closest = low->first;
+			iterA = low;
+			iterB = prev;
+		} else {
+			// Low == events.end(), so might be the last note in the sequence
+			if (!events.empty()) {
+				iterA = std::prev(events.end());
+				distA = std::abs(iterA->first - mousePosMapped.y);
 			}
 		}
+
+		bool isPrevClosest = distB < distA;
+
+		if (distA < threshold || distB < threshold) {
+			if (isPrevClosest)
+				closest = iterB->first;
+			else
+				closest = iterA->first;
+		}
+
 
 		sf::Event w_event;
 		while (window.pollEvent(w_event)) {
@@ -778,7 +803,7 @@ int main() {
 
 #if INTPTR_MAX == INT32_MAX
 			auto size_t_len = ImGuiDataType_U32;
-#elif
+#else
 			auto size_t_len = ImGuiDataType_U64;
 #endif
 			const size_t step = 1U;
@@ -786,6 +811,12 @@ int main() {
 			ImGui::InputScalar("Max undo levels", size_t_len, &MAX_ACTION_HISTORY, &step);
 
 			ImGui::PopItemWidth();
+
+			float fps = 0.0f;
+			if (last_framecount > 0) {
+				fps = (float)last_framecount;
+			}
+			ImGui::Text("FPS: %f", fps);
 		}
 		ImGui::End();
 
@@ -1158,6 +1189,7 @@ is loaded by entering "tutorial".)
 		
 		ImGui::SFML::Render(window);
 		window.display();
+		framecount++;
 	}
 
 	saveSettings();
