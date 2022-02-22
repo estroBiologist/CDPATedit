@@ -42,10 +42,17 @@ bool resFolderFound = false;
 bool helpPanelOpen = false;
 std::string godot_path = "";
 
+std::vector<cdpat::NoteRef> selectedNotes{};
 
 
+bool isNoteSelected(const cdpat::NoteRef& noteRef) {
+	return std::find_if(selectedNotes.begin(), selectedNotes.end(), [&](const cdpat::NoteRef& note) { return note.beat == noteRef.beat && note.lane == noteRef.lane; }) != selectedNotes.end();
+}
 
-
+void cancelSelection() {
+	if (!selectedNotes.empty())
+		pattern.applyAction<cdpat::DeselectAction>(selectedNotes);
+}
 
 void requestSaveAndCallback(std::function<void()>&& callback) {
 	if (pattern.hasUnsavedChanges()) {
@@ -358,15 +365,6 @@ int main() {
 	
 	float noteRadius = 20.0f;
 
-	
-	enum class Tool {
-		Place,
-		Select,
-		Erase,
-	};
-	
-	Tool currentTool = Tool::Place;
-
 	sf::Clock framerateClock;
 	unsigned framecount = 0;
 	unsigned last_framecount = 0;
@@ -416,6 +414,7 @@ int main() {
 		float distB = INFINITY;
 		cdpat::EventsData::const_iterator iterA;
 		cdpat::EventsData::const_iterator iterB;
+
 		if (low != events.end()) {
 			//If `low` is the first event, prev is invalid
 			auto prev = low == events.begin() ? events.end() : std::prev(low);
@@ -491,35 +490,37 @@ int main() {
 					if (ImGui::GetIO().WantCaptureMouse) 
 						break;
 					
-					
+					// Tool
 					if (mousePosMapped.x < 0.f || mousePosMapped.x > 3.f)
 						break;
 						
-					switch (currentTool) {
-						case Tool::Place: {
-							if (beat < 0.0f) 
-								break;
+					if (beat < 0.0f) 
+						break;
 
-							if (w_event.mouseButton.button == sf::Mouse::Left) {
-								
-								if (!noteFound)
-									pattern.applyAction<PlaceNoteAction>(beat, lane, 0.0f);
-								
-							} else if (w_event.mouseButton.button == sf::Mouse::Right) {
 
-								if (closest > 0.0f) 
-									pattern.applyAction<EraseNoteAction>(closest, lane);
+					if (sf::Keyboard::isKeyPressed(sf::Keyboard::LControl)) {
 
-							} /*else { //Middle mouse button
-								auto note_drag_action = MoveHoldLongAction();
-								if (closest > 0.0f)
-									pattern.initLongAction(&note_drag_action);
-							}*/
-							break;
+						if (w_event.mouseButton.button == sf::Mouse::Left && noteFound) {
+							if (!sf::Keyboard::isKeyPressed(sf::Keyboard::LShift))
+								cancelSelection();
+							auto noteRef = cdpat::NoteRef{ beat, lane };
+							pattern.applyAction<NoteSelectAction>(selectedNotes, std::vector{ noteRef }, !isNoteSelected(noteRef));
 						}
-						default:
-							break;
+
+					} else {
+						// No Ctrl held, place or erase notes
+						if (w_event.mouseButton.button == sf::Mouse::Left && !noteFound) {
+							cancelSelection();
+							pattern.applyAction<PlaceNoteAction>(beat, lane, 0.0f);
+						}
+
+						else if (w_event.mouseButton.button == sf::Mouse::Right && closest > 0.0f) {
+							pattern.applyAction<EraseNoteAction>(closest, lane);
+						}
+						
+						break;
 					}
+						
 				}
 				break;
 				
@@ -1136,7 +1137,11 @@ is loaded by entering "tutorial".)
 				if (event.type == "note") {
 					lane = std::get<int>(event.args[0]);
 					
-					note.setFillColor(sf::Color(lane_colors[lane]));
+					auto color = sf::Color(lane_colors[lane]);
+
+					if (isNoteSelected({ beat, lane }))
+						color = sf::Color::Blue;
+					note.setFillColor(color);
 					
 					
 					// Note hold
