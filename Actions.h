@@ -277,5 +277,75 @@ namespace cdpat {
 
 	};
 
+
+	class NoteSelectAction : public Action {
+		std::vector<cdpat::NoteRef>& selectedNotesRef;
+		std::vector<cdpat::NoteRef> notesToModify;
+		bool addToSelection;
+
+		void addNotes() {
+			selectedNotesRef.reserve(selectedNotesRef.size() + notesToModify.size());
+
+			// this doesn't work if selectedNotesRef == notesToModify (ie when deselecting)
+			selectedNotesRef.insert(selectedNotesRef.end(), notesToModify.begin(), notesToModify.end());
+			
+		}
+
+		void removeNotes() {
+			selectedNotesRef.resize(selectedNotesRef.size() - notesToModify.size());
+		}
+
+	public:
+		~NoteSelectAction() override = default;
+
+		void apply(Pattern & pattern) override {
+			if (addToSelection)
+				addNotes();
+			else
+				removeNotes();
+		}
+
+		void undo(Pattern & pattern) override {
+			if (addToSelection)
+				removeNotes();
+			else
+				addNotes();
+		}
+
+		std::string getDescription() const override {
+			if (addToSelection)
+				return notesToModify.size() > 1 ? "Select notes" : "Select note";
+			else
+				return notesToModify.size() > 1 ? "Deselect notes" : "Deselect note";
+		}
+
+		NoteSelectAction(std::vector<cdpat::NoteRef>& selectedNotesRef, std::vector<cdpat::NoteRef>&& notesToModify, bool addToSelection) 
+			: selectedNotesRef(selectedNotesRef), 
+			notesToModify(std::move(notesToModify)), 
+			addToSelection(addToSelection) {}
+	};
+
+	class DeselectAction : public Action {
+		std::vector<cdpat::NoteRef>& selectedNotesRef;
+		std::vector<cdpat::NoteRef> notesToModify;
+
+	public:
+		~DeselectAction() override = default;
+
+		void apply(Pattern& pattern) override {
+			notesToModify = std::move(selectedNotesRef);
+		}
+
+		void undo(Pattern& pattern) override {
+			selectedNotesRef = std::move(notesToModify);
+		}
+
+		std::string getDescription() const override {
+			return "Cancel selection";
+		}
+
+		DeselectAction(std::vector<cdpat::NoteRef>& selectedNotesRef)
+			: selectedNotesRef(selectedNotesRef) {}
+	};
 	
 }
