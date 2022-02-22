@@ -283,8 +283,8 @@ namespace cdpat {
 		int sig = 4;
 
 		template<typename ActionType, typename... Args>
-		void applyAction(Args... args) {
-			std::unique_ptr<Action> action = std::make_unique<ActionType>(args...);
+		void applyAction(Args&&... args) {
+			std::unique_ptr<Action> action = std::make_unique<ActionType>(std::forward<Args>(args)...);
 			unsaved_changes = true;
 			
 			if (action_index + 1 < actions_stack.size())
