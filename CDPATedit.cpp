@@ -320,6 +320,27 @@ void setPlayingPosition(sf::Time position) {
 		stem.player.setPlayingOffset(position);
 	
 }
+
+
+float scroll_y = 0.0f;
+float scroll_y_goal = -0.5f;
+
+
+float start_offset = 256.0f;
+float lane_offset = 128.0f;
+float y_scale = 200.0f;
+
+sf::Vector2f mapMouseToScreen(sf::Vector2i mousePos) {
+	auto mousePosMapped = sf::Vector2f(mousePos);
+	mousePosMapped.x -= start_offset;
+	mousePosMapped.x /= lane_offset;
+	mousePosMapped.y /= y_scale;
+	mousePosMapped.y += scroll_y;
+	return mousePosMapped;
+}
+
+
+
 int main() {
 	using namespace cdpat;
 	const std::array<std::string, 3> TOOLS {"Select", "Place", "Erase"};
@@ -350,19 +371,19 @@ int main() {
 	loadSettings();
 	refreshDirectory();
 
+	const auto highlightColor = sf::Color(255, 0, 42);
 	
-	//bool playing = false;
+	sf::Vector2f mouseDragStart;
+	bool mouseDragging = false;
+	enum MouseDragMode {
+		None,
+		Select,
+		ResizeHold,
+	};
+	MouseDragMode dragMode = None;
+	std::function<void(sf::Vector2f)> mouseDragFinishCallback;
 	
-	float scroll_y = 0.0f;
-	float scroll_y_goal = -0.5f;
-	
-	
-	float start_offset = 256.0f;
-	float lane_offset = 128.0f;
-	float y_scale = 200.0f;
-	
-	float snap = 0.25f;
-	
+	float snap = 0.25f;	
 	float noteRadius = 20.0f;
 
 	sf::Clock framerateClock;
@@ -378,11 +399,7 @@ int main() {
 		}
 
 
-		auto mousePosMapped = sf::Vector2f(sf::Mouse::getPosition(window));
-		mousePosMapped.x -= start_offset;
-		mousePosMapped.x /= lane_offset;
-		mousePosMapped.y /= y_scale;
-		mousePosMapped.y += scroll_y;
+		auto mousePosMapped = mapMouseToScreen(sf::Mouse::getPosition(window));
 		
 		int lane = static_cast<int>(round(mousePosMapped.x));
 		
@@ -523,7 +540,7 @@ int main() {
 						
 				}
 				break;
-				
+
 				case sf::Event::KeyPressed: {
 					using namespace sf;
 					
