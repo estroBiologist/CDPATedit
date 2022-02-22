@@ -24,6 +24,7 @@
     <ProjectGuid>{4e1436cd-493b-492b-8236-b978535b9cb2}</ProjectGuid>
     <RootNamespace>CDPATedit</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>CDPATedit-windows</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -56,6 +57,7 @@
   <ImportGroup Label="ExtensionSettings">
   </ImportGroup>
   <ImportGroup Label="Shared">
+    <Import Project="..\CDPATedit-shared\CDPATedit-shared.vcxitems" Label="Shared" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
@@ -146,33 +148,6 @@
       <AdditionalDependencies>opengl32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <ClCompile Include="CDPAT.cpp" />
-    <ClCompile Include="CDPATedit.cpp" />
-    <ClCompile Include="imgui-SFML.cpp" />
-    <ClCompile Include="imgui.cpp" />
-    <ClCompile Include="imgui_demo.cpp" />
-    <ClCompile Include="imgui_draw.cpp" />
-    <ClCompile Include="imgui_stdlib.cpp" />
-    <ClCompile Include="imgui_tables.cpp" />
-    <ClCompile Include="imgui_widgets.cpp" />
-    <ClCompile Include="tinyfiledialogs.c" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="Actions.h" />
-    <ClInclude Include="CDPAT.h" />
-    <ClInclude Include="imconfig-SFML.h" />
-    <ClInclude Include="imconfig.h" />
-    <ClInclude Include="imgui-SFML.h" />
-    <ClInclude Include="imgui-SFML_export.h" />
-    <ClInclude Include="imgui.h" />
-    <ClInclude Include="imgui_internal.h" />
-    <ClInclude Include="imgui_stdlib.h" />
-    <ClInclude Include="imstb_rectpack.h" />
-    <ClInclude Include="imstb_textedit.h" />
-    <ClInclude Include="imstb_truetype.h" />
-    <ClInclude Include="tinyfiledialogs.h" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
