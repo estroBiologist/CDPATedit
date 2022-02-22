@@ -313,10 +313,11 @@ namespace cdpat {
 		}
 
 		std::string getDescription() const override {
+			auto num = std::to_string(notesToModify.size());
 			if (addToSelection)
-				return notesToModify.size() > 1 ? "Select notes" : "Select note";
+				return notesToModify.size() > 1 ? "Select " + num + " notes" : "Select 1 note";
 			else
-				return notesToModify.size() > 1 ? "Deselect notes" : "Deselect note";
+				return notesToModify.size() > 1 ? "Deselect " + num + " notes" : "Deselect 1 note";
 		}
 
 		NoteSelectAction(std::vector<cdpat::NoteRef>& selectedNotesRef, std::vector<cdpat::NoteRef>&& notesToModify, bool addToSelection) 
