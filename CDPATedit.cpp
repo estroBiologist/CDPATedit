@@ -222,6 +222,7 @@ void reloadAudio() {
 		std::cout << "Failed loading stream, aborting music load\n";
 		return;
 	}
+	mus_player.setLoop(true);
 	mus_player.setBuffer(mus);
 	mus_player.play();
 	mus_player.pause();
@@ -282,8 +283,10 @@ bool playing = false;
 void startPlayback() {
 	playing = true;
 	mus_player.play();
+	mus_player.setLoop(true);
 	for (auto& stem : stems)
 		if (stem.active) {
+			stem.player.setLoop(false);
 			stem.player.play();
 			stem.player.setPlayingOffset(mus_player.getPlayingOffset());
 		}
@@ -960,22 +963,62 @@ int main() {
 			if (ImGui::Button(playing ? "Pause" : "Play")) 
 				togglePlayback();
 			
-			
 			ImGui::SameLine();
 			
 			if (ImGui::Button("Stop")) 
 				stopPlayback();
-			
-			
+
+
+			// Play offset information
+
+			float playOffset = 0.0f;
+			float totalLength = 0.0f;
+			if (mus_player.getBuffer()) {
+				playOffset = mus_player.getPlayingOffset().asSeconds();
+				totalLength = mus_player.getBuffer()->getDuration().asSeconds();
+			}
+			float zero = 0.0f; // i love c++
+
+			bool editedThisFrame = false;
+
+			if (ImGui::SliderScalar("##PlayOffset", ImGuiDataType_Float, &playOffset, &zero, &totalLength, ""))
+				mus_player.setPlayingOffset(sf::seconds(playOffset));
+
+			ImGui::Text("%02d:%02d:%02d.%03d (measure %d, beat %d)",
+				static_cast<int>(playOffset / 3600.f),
+				static_cast<int>(playOffset / 60.f),
+				static_cast<int>(std::fmod(playOffset, 60.f)),
+				static_cast<int>(std::fmod(playOffset, 1.0f) * 1000), 
+				static_cast<int>(playback_position) / pattern.sig,
+				static_cast<int>(playback_position) % pattern.sig
+			);
 			
 			ImGui::Separator();
 			
-			ImGui::Text("Tool");
-			ImGui::InputFloat("##Snap", &snap);
 			
-			ImGui::SameLine(); if (ImGui::Button("x2")) snap *= 2.0f;
-			ImGui::SameLine(); if (ImGui::Button("/2")) snap /= 2.0f;
-			ImGui::SameLine(); ImGui::Text("Snap");
+			ImGui::Text("Tool");
+			ImGui::Text("Snap");
+			static size_t currentSnapIdx = 3;
+			static std::vector<std::pair<std::string, float>> snapValues = {
+				{"Beat", 1.0f},
+				{"1/2 Beat", 0.5f},
+				{"1/3 Beat", 1.0f / 3.0f},
+				{"1/4 Beat", 0.25f},
+				{"1/6 Beat", 1.0f / 6.0f},
+				{"1/8 Beat", 0.125f},
+				{"Disabled", 0.0f}
+			};
+
+			if (ImGui::BeginCombo("##Snap", snapValues[currentSnapIdx].first.c_str())) {
+				for (int i = 0; i < snapValues.size(); i++) {
+					if (ImGui::Selectable(snapValues[i].first.c_str())) {
+						currentSnapIdx = i;
+						snap = snapValues[i].second;
+					}
+				}
+				ImGui::EndCombo();
+			}
+			
 			ImGui::Separator();
 			
 			ImGui::Text("History");
