@@ -569,11 +569,11 @@ int main() {
 						// No Ctrl held, place or erase notes
 						if (w_event.mouseButton.button == sf::Mouse::Left && !noteFound) {
 							cancelSelection();
-							pattern.applyAction<PlaceNoteAction>(beat, lane, 0.0f);
+							pattern.applyAction<NoteAction>(std::vector{ cdpat::NoteRef{ beat, lane } }, true);
 						}
 
 						else if (w_event.mouseButton.button == sf::Mouse::Right && closest > 0.0f) {
-							pattern.applyAction<EraseNoteAction>(closest, lane);
+							pattern.applyAction<NoteAction>(std::vector{ cdpat::NoteRef{ closest, lane } }, false);
 						}
 						
 						break;

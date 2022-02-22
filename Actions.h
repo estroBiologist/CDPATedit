@@ -24,7 +24,7 @@ namespace cdpat {
 
 	};
 	*/
-	class PlaceNoteAction : public Action {
+	/*class PlaceNoteAction : public Action {
 		int lane = 0;
 		float hold_length = 0.0f;
 		float beat = 0.0f;
@@ -102,6 +102,107 @@ namespace cdpat {
 		}
 		
 		EraseNoteAction(float beat, int lane) : lane(lane), beat(beat) {}
+
+	};*/
+
+
+	// Placing and erasing notes
+	class NoteAction : public Action {
+		std::vector<NoteRef> noteRefs;
+		std::vector<BeatEvent> notes;
+		std::vector<size_t> indices;
+		bool isPlaceEvent = true;
+
+		void placeNotes(Pattern& pattern) {
+			bool append = indices.empty(); // for instance, when placing
+
+			for (int i = 0; i < noteRefs.size(); i++) {
+				auto& events = getEventsData(pattern)[noteRefs[i].beat];
+				if (append)
+					events.push_back(notes[i]);
+				else
+					events.insert(events.begin() + indices[i], notes[i]);
+
+			}
+			indices.clear();
+			notes.clear();
+		}
+		
+		void eraseNotes(Pattern& pattern) {
+			notes.reserve(noteRefs.size());
+			indices.reserve(noteRefs.size());
+
+			for (const auto& noteRef : noteRefs) {
+				auto& events = getEventsData(pattern)[noteRef.beat];
+
+				for (size_t i = 0; i < events.size(); i++) {
+					if (events[i].type == "note" && std::get<int>(events[i].args[0]) == noteRef.lane) {
+						notes.push_back(events[i]);
+						indices.push_back(i);
+						events.erase(events.begin() + i);
+						break;
+					}
+				}
+			}
+		}
+	public:
+		~NoteAction() override = default;
+
+		void apply(Pattern& pattern) override {
+			if (isPlaceEvent)
+				placeNotes(pattern);
+			else
+				eraseNotes(pattern);
+		}
+
+		void undo(Pattern& pattern) override {
+			if (isPlaceEvent)
+				eraseNotes(pattern);
+			else
+				placeNotes(pattern);
+		}
+
+		std::string getDescription() const override {
+			auto count = std::to_string(noteRefs.size());
+			if (isPlaceEvent) {
+				if (noteRefs.size() == 1) {
+
+					auto beat_string = std::to_string(noteRefs[0].beat);
+					beat_string.erase(beat_string.find_last_not_of('0') + 1, std::string::npos);
+
+					if (beat_string.back() == '.')
+						beat_string.resize(beat_string.size() - 1);
+
+					return "Place note at (" + std::to_string(noteRefs[0].lane) + ", " + beat_string + ")";
+				} else {
+					return "Place " + count + " notes";
+				}
+			}
+			else {
+				if (noteRefs.size() == 1) {
+					auto beat_string = std::to_string(noteRefs[0].beat);
+					beat_string.erase(beat_string.find_last_not_of('0') + 1, std::string::npos);
+				
+					if (beat_string.back() == '.')
+						beat_string.resize(beat_string.size() - 1);
+
+					return "Erase note at (" + std::to_string(noteRefs[0].lane) + ", " + beat_string + ")";
+				}
+				else {
+					return "Erase " + count + " notes";
+				}
+			}
+		}
+
+		NoteAction(std::vector<NoteRef> noteRefs, bool isPlaceEvent) : noteRefs(noteRefs), isPlaceEvent(isPlaceEvent) {
+			if (isPlaceEvent) {
+				// Create notes in memory to place
+				notes.reserve(noteRefs.size());
+				for (const auto& noteRef : noteRefs) {
+					notes.push_back(BeatEvent{ "note", {noteRef.lane} });
+				}
+			}
+		}
 
 	};
 
