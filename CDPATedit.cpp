@@ -517,11 +517,52 @@ int main() {
 
 					if (sf::Keyboard::isKeyPressed(sf::Keyboard::LControl)) {
 
-						if (w_event.mouseButton.button == sf::Mouse::Left && noteFound) {
-							if (!sf::Keyboard::isKeyPressed(sf::Keyboard::LShift))
-								cancelSelection();
-							auto noteRef = cdpat::NoteRef{ beat, lane };
-							pattern.applyAction<NoteSelectAction>(selectedNotes, std::vector{ noteRef }, !isNoteSelected(noteRef));
+						if (w_event.mouseButton.button == sf::Mouse::Left) {
+							
+
+							if (noteFound) {
+								if (!sf::Keyboard::isKeyPressed(sf::Keyboard::LShift))
+									cancelSelection();
+
+								auto noteRef = cdpat::NoteRef{ beat, lane };
+								pattern.applyAction<NoteSelectAction>(selectedNotes, std::vector{ noteRef }, !isNoteSelected(noteRef));
+							} else {
+								// Start dragging
+								mouseDragStart = mousePosMapped;
+								mouseDragging = true;
+								dragMode = Select;
+
+								mouseDragFinishCallback = [&](sf::Vector2f mouseDragFinish) {
+									if (!sf::Keyboard::isKeyPressed(sf::Keyboard::LShift))
+										cancelSelection();
+
+									std::vector<cdpat::NoteRef> notesToSelect{};
+									sf::Vector2f topLeft{ std::min(mouseDragStart.x, mouseDragFinish.x),std::min(mouseDragStart.y, mouseDragFinish.y) };
+									sf::Vector2f bottomRight{ std::max(mouseDragStart.x, mouseDragFinish.x),std::max(mouseDragStart.y, mouseDragFinish.y) };
+									
+									auto low = events.lower_bound(topLeft.y);
+									auto hi = events.upper_bound(bottomRight.y);
+
+									if (low == events.end())
+										return;
+
+									for (auto it = low; it != hi; ++it) {
+										auto events = it->second;
+
+										for (const auto& event : events) {
+											if (event.type == "note") {
+												int lane = std::get<int>(event.args[0]);
+
+												if (lane >= topLeft.x && lane <= bottomRight.x)
+													notesToSelect.push_back({ it->first, lane });
+											}
+										}
+									}
+									if (!notesToSelect.empty())
+										pattern.applyAction<NoteSelectAction>(selectedNotes, std::move(notesToSelect), true);
+									
+								};
+							}
 						}
 
 					} else {
@@ -594,6 +635,12 @@ int main() {
 		if (sf::Mouse::isButtonPressed(sf::Mouse::Left) && mousePosMapped.x < 0.0f) {
 			setPlayingPosition(sf::seconds(beatsToSecs(beat, pattern.bpm)));
 			//TODO: Scroll at top and bottom of screen
+		}
+
+		if (!sf::Mouse::isButtonPressed(sf::Mouse::Left) && mouseDragging) {
+			mouseDragFinishCallback(mousePosMapped);
+			mouseDragging = false;
+			dragMode = None;
 		}
 		
 		
@@ -1125,7 +1172,7 @@ is loaded by entering "tutorial".)
 		
 		
 		// Draw events
-		if (mousePosMapped.x >= 0.f && mousePosMapped.x <= 3.f) {
+		if (!sf::Keyboard::isKeyPressed(sf::Keyboard::LControl) && mousePosMapped.x >= 0.f && mousePosMapped.x <= 3.f) {
 			note.setPosition({start_offset + lane_offset * lane, y_scale * (beat - scroll_y)});
 			auto transColor = sf::Color{lane_colors[lane]};
 			transColor.a = 127;
@@ -1154,11 +1201,15 @@ is loaded by entering "tutorial".)
 				if (event.type == "note") {
 					lane = std::get<int>(event.args[0]);
 					
-					auto color = sf::Color(lane_colors[lane]);
 
-					if (isNoteSelected({ beat, lane }))
-						color = sf::Color::Blue;
-					note.setFillColor(color);
+					if (isNoteSelected({ beat, lane })) {
+						note.setOutlineColor(highlightColor);
+						note.setOutlineThickness(3.0f);
+					} else {
+						note.setOutlineThickness(0.0f);
+					}
+
+					note.setFillColor(sf::Color(lane_colors[lane]));
 					
 					
 					// Note hold
@@ -1208,6 +1259,35 @@ is loaded by entering "tutorial".)
 				window.draw(note);
 			}
 		}
+
+		if (mouseDragging) {
+			// Draw mouse drag effects
+			switch (dragMode) {
+			case Select: {
+					sf::RectangleShape selectRect;
+					sf::Vector2f startPosScr = { start_offset + lane_offset * mouseDragStart.x, y_scale * (mouseDragStart.y - scroll_y) };
+					sf::Vector2f endPosScr = { start_offset + lane_offset * mousePosMapped.x, y_scale * (mousePosMapped.y - scroll_y) };
+					selectRect.setPosition(startPosScr);
+					selectRect.setSize(endPosScr - startPosScr);
+					auto fillCol = highlightColor;
+					fillCol.a = 50;
+					selectRect.setFillColor(fillCol);
+					selectRect.setOutlineColor(highlightColor);
+					selectRect.setOutlineThickness(5.f);
+					window.draw(selectRect);
+				}
+				break;
+
+			case ResizeHold:
+
+				break;
+
+			default:
+
+				break;
+			}
+		}
+
 		
 		ImGui::SFML::Render(window);
 		window.display();
