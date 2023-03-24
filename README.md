@@ -1,5 +1,7 @@
 # CDPATedit
 
+> NOTE: This repository is publicly available for portfolio purposes, although CHORDIOID itself isn't. I want to work on making this editor more independent in the future, but as of right now it's pretty useless without the necessary Godot project structure.
+
 Editor for CHORDIOID's beatmap format, `.cdpat`.
 
 ## Downloading
